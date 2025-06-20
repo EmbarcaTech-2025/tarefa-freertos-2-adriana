@@ -18,9 +18,9 @@ cmake_minimum_required(VERSION 3.12)
 set(PICO_BOARD pico CACHE STRING "Board type")
 
 # Caminho do SDK
-set(PICO_SDK_PATH "${USERHOME}/.pico-sdk/sdk/2.1.1")
+set(PICO_SDK_PATH "C:/Users/user/.pico-sdk/sdk/2.1.1")
 
-# Importa o SDK do Pico (Esta linha é crucial e deve vir antes de usar comandos PIO)
+# Importa o SDK do Pico
 include(${PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
 # FreeRTOS
@@ -34,6 +34,10 @@ message("FreeRTOS Kernel located in ${FREERTOS_KERNEL_PATH}")
 # Define o projeto
 project(embarcatech-tarefa-freertos-2- C CXX ASM)
 
+# Define o padrão da linguagem C
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+
 # Inicializa o SDK (depois do project!)
 pico_sdk_init()
 
@@ -42,18 +46,20 @@ include(${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_i
 
 # Adiciona o executável
 add_executable(embarcatech-tarefa-freertos-2-
-    main.c
-    ws2818b.pio # Adicionado o arquivo PIO aqui! 
-    oled/ssd1306.c
-    src/joystick_task.c
-    src/car_indicators_task.c
-    src/car_control_task.c
-    src/oled_task.c
-    src/led_matrix_task.c # Descomentado/Adicionado
+        main.c
+        # ws2818b.pio
+        oled/ssd1306.c
+        src/joystick_task.c
+        src/car_indicators_task.c
+        # src/car_status_data.h
+        src/car_control_task.c
+        src/oled_task.c
+        #src/led_matrix_task.c
+        src/engine_sound_task.c
 )
 
-# Agora o pico_add_pio_program deve funcionar (DEPOIS DA INCLUSÃO DO SDK e add_executable)
-pico_add_pio_program(embarcatech-tarefa-freertos-2- ${CMAKE_CURRENT_LIST_DIR}/ws2818b.pio)
+# Agora o pico_add_pio_program deve funcionar
+# pico_add_pio_program(embarcatech-tarefa-freertos-2 ${CMAKE_CURRENT_LIST_DIR}/ws2818b.pio)
 
 # Ativa USB
 pico_enable_stdio_usb(embarcatech-tarefa-freertos-2- 1)
@@ -71,7 +77,9 @@ target_link_libraries(embarcatech-tarefa-freertos-2-
     pico_stdlib
     hardware_i2c
     hardware_adc
-    hardware_pio # Adicionado para usar o PIO 
+    hardware_pwm
+    #hardware_pio
+    #hardware_clocks
     FreeRTOS-Kernel-Heap4
 )
 

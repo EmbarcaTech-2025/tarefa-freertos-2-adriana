@@ -7,9 +7,9 @@
 #include "car_indicators_task.h"
 #include "car_control_task.h"
 #include "car_status_data.h"
+#include "engine_sound_task.h"
 #include "oled_task.h"
 #include "ssd1306.h"
-#include "led_matrix_task.h" // Novo: Incluir cabeçalho da tarefa da matriz de LEDs
 
 QueueHandle_t xJoystickQueue;
 QueueHandle_t xCarStatusQueue;
@@ -27,14 +27,14 @@ void vMonitorJoystickTask(void *pvParameters) {
                    received_joystick_data.button_B_state);
         }
         if (xQueueReceive(xCarStatusQueue, &received_car_status, 0) == pdPASS) {
-            printf("Monitor Car: Speed=%d Km/h, RPM=%d, Gear=%d, ABS=%d, Airbag=%d, Horn=%d, Red_LED=%d\n",
+            printf("Monitor Car: Speed=%d Km/h, RPM=%d, Gear=%d, ABS=%d, Airbag=%d, Horn=%d\n",
                    received_car_status.current_speed_kmh,
                    received_car_status.current_rpm,
                    received_car_status.current_gear,
                    received_car_status.abs_active,
                    received_car_status.airbag_deployed,
                    received_car_status.horn_active,
-                   received_car_status.red_led_active); // Adicionado para depuração
+                   received_car_status.red_led_active);
         }
         vTaskDelay(pdMS_TO_TICKS(500)); // Imprime a cada 500ms
     }
@@ -45,7 +45,7 @@ int main() {
     sleep_ms(1000);
     printf("Main: Inicializando sistema...\n");
 
-    // Teste inicial do OLED (mantido, pois inicializa o I2C para a tarefa do OLED)
+    // Teste inicial do OLED
     ssd1306_init();
     ssd1306_clear();
     ssd1306_draw_string(0, 0, "Sistema Iniciado");
@@ -60,18 +60,14 @@ int main() {
     configASSERT(xJoystickQueue);
     configASSERT(xCarStatusQueue);
 
-    // Criação das tarefas
     xTaskCreate(vJoystickTask, "JoystickTask", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 3, NULL);
     xTaskCreate(vCarControlTask, "CarControlTask", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 2, NULL);
     xTaskCreate(vCarIndicatorsTask, "CarIndicatorsTask", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
     xTaskCreate(vOledTask, "OledTask", configMINIMAL_STACK_SIZE + 200, NULL, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(vLedMatrixTask, "LedMatrixTask", configMINIMAL_STACK_SIZE + 256, NULL, tskIDLE_PRIORITY + 1, NULL); // Novo: Cria a tarefa da matriz de LEDs
     xTaskCreate(vMonitorJoystickTask, "MonitorJoystickTask", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+    xTaskCreate(vEngineSoundTask, "EngineSoundTask", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 0, NULL);
 
     vTaskStartScheduler();
 
-    while (true) {
-        // Este loop infinito só será alcançado se o escalonador do FreeRTOS falhar.
-        // Em um sistema FreeRTOS funcionando, o controle nunca chega aqui.
-    }
+    while (true) {}
 }
