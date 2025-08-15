@@ -12,46 +12,72 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-set(PICO_BOARD pico CACHE STRING "Board type")
-
 cmake_minimum_required(VERSION 3.12)
 
-# Set any variables required for importing libraries
-if (DEFINED ENV{FREERTOS_PATH})
-  SET(FREERTOS_PATH $ENV{FREERTOS_PATH})
+# Escolhe a placa
+set(PICO_BOARD pico CACHE STRING "Board type")
+
+# Caminho do SDK
+set(PICO_SDK_PATH "${USERHOME}/.pico-sdk/sdk/2.1.1")
+
+# Importa o SDK do Pico (Esta linha é crucial e deve vir antes de usar comandos PIO)
+include(${PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+
+# FreeRTOS
+if (DEFINED ENV{FREERTOS_KERNEL_PATH})
+    set(FREERTOS_KERNEL_PATH $ENV{FREERTOS_KERNEL_PATH})
 else()
-  SET(FREERTOS_PATH ${CMAKE_CURRENT_LIST_DIR}/FreeRTOS-Kernel)
+    set(FREERTOS_KERNEL_PATH ${CMAKE_CURRENT_LIST_DIR}/FreeRTOS)
 endif()
+message("FreeRTOS Kernel located in ${FREERTOS_KERNEL_PATH}")
 
-message("FreeRTOS Kernel located in ${FREERTOS_PATH}")
-
-# Import those libraries
-include(pico_sdk_import.cmake)
-include(${FREERTOS_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake)
-
-# Define project
+# Define o projeto
 project(embarcatech-tarefa-freertos-2 C CXX ASM)
 
-# Initialize the Raspberry Pi Pico SDK
+# Inicializa o SDK (depois do project!)
 pico_sdk_init()
 
+# Importa o FreeRTOS (depois do pico_sdk_init!)
+include(${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake)
+
+# Adiciona o executável
 add_executable(embarcatech-tarefa-freertos-2
     main.c
+    ws2818b.pio # Adicionado o arquivo PIO aqui! 
+    oled/ssd1306.c
+    src/joystick_task.c
+    src/car_indicators_task.c
+    src/car_control_task.c
+    src/oled_task.c
+    src/engine_sound_task.c
+    src/injector_task.c
+    src/led_matrix_task.c # Descomentado/Adicionado
 )
 
+# Agora o pico_add_pio_program deve funcionar (DEPOIS DA INCLUSÃO DO SDK e add_executabl
+pico_add_pio_program(embarcatech-tarefa-freertos-2 ${CMAKE_CURRENT_LIST_DIR}/ws2818b.pio)
+
+# Ativa USB
+pico_enable_stdio_usb(embarcatech-tarefa-freertos-2 1)
+
+# Includes
 target_include_directories(embarcatech-tarefa-freertos-2 PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/include
+    ${CMAKE_CURRENT_LIST_DIR}/src
+    ${CMAKE_CURRENT_LIST_DIR}/oled
 )
 
-target_link_libraries(embarcatech-tarefa-freertos-2 
-    pico_stdlib 
-    FreeRTOS-Kernel-Heap4 
+# Liga as bibliotecas necessárias
+target_link_libraries(embarcatech-tarefa-freertos-2
+    pico_stdlib
     hardware_i2c
-    )
+    hardware_adc
+    hardware_pwm
+    hardware_clocks
+    hardware_pio # Adicionado para usar o PIO 
+    FreeRTOS-Kernel-Heap4
+)
 
+# Gera arquivos .uf2 e outros
 pico_add_extra_outputs(embarcatech-tarefa-freertos-2)
-
-# if you have anything in "lib" folder then uncomment below - remember to add a CMakeLists.txt
-# file to the "lib" directory
-#add_subdirectory(lib)

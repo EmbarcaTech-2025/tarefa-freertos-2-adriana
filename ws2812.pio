@@ -1,0 +1,77 @@
+; ws2818b.pio
+; Programa PIO para controlar LEDs WS2812B (também conhecidos como WS2818B ou NeoPixel)
+; Este programa é otimizado para gerar os pulsos de temporização precisos exigidos pelos LEDs.
+
+.program ws2812b
+.side_set 1 opt              ; Define uma saída lateral para o pino de dados, opcionalmente com um bit de controle (neste caso, 1 bit para o pino de dados).
+                             ; Isso nos permite controlar o pino de dados diretamente com as instruções.
+
+; Define as durações dos pulsos em termos de ciclos de clock do PIO.
+; O clock do PIO será configurado para 8MHz (8 ciclos = 1 us).
+; WS2812B Timing: T0H = 0.4us (low), T0L = 0.85us (high)  -- bit 0
+;                 T1H = 0.8us (high), T1L = 0.45us (low)  -- bit 1
+;                 (Valores aproximados, datasheet varia um pouco. Este timing é um dos mais comuns.)
+
+; Ajustamos para o clock de 8MHz: 1 ciclo = 125ns = 0.125us
+; T0H: 0.4us / 0.125us = 3.2 ciclos. Usaremos 3 ciclos para T0H
+; T0L: 0.85us / 0.125us = 6.8 ciclos. Usaremos 7 ciclos para T0L
+; T1H: 0.8us / 0.125us = 6.4 ciclos. Usaremos 6 ciclos para T1H
+; T1L: 0.45us / 0.125us = 3.6 ciclos. Usaremos 4 ciclos para T1L
+
+; Total de ciclos por bit: T0H + T0L = 3+7 = 10 ciclos
+;                       T1H + T1L = 6+4 = 10 ciclos
+; Isso significa que cada bit transmitido leva 10 ciclos de clock do PIO (1.25us).
+
+public entry_point:
+    out x, 1 [6] side 0    ; Envia o MSB do registrador X. 1 bit por vez.
+                           ; [6] atrasa 6 ciclos ANTES de executar a próxima instrução.
+                           ; side 0: Seta o pino de dados para LOW (0). Este é o T0H/T1H para o próximo bit.
+    jmp !x, .bit_zero      ; Se o bit de saída for 0, pula para .bit_zero.
+    jmp .bit_one           ; Se o bit de saída for 1, pula para .bit_one.
+
+.bit_one:
+    out x, 1 [3] side 1    ; Envia o MSB do registrador X.
+                           ; [3] atrasa 3 ciclos ANTES da próxima instrução.
+                           ; side 1: Seta o pino de dados para HIGH (1). Este é o T1H (0.8us).
+    jmp entry_point        ; Volta para processar o próximo bit.
+
+.bit_zero:
+    out x, 1 [6] side 1    ; Envia o MSB do registrador X.
+                           ; [6] atrasa 6 ciclos ANTES da próxima instrução.
+                           ; side 1: Seta o pino de dados para HIGH (1). Este é o T0H (0.4us).
+    jmp entry_point        ; Volta para processar o próximo bit.
+
+% c-sdk {
+#include "hardware/clocks.h" // Necessário para configurar o clock do PIO
+
+static inline void ws2812b_program_init(PIO pio, uint sm, uint offset, uint pin, float freq, bool rgbw) {
+    // Configura o Estado da Máquina (SM) para usar o programa PIO compilado.
+    pio_sm_config c = ws2812b_program_get_default_config(offset);
+
+    // Define o pino de saída e a configuração de side-set.
+    // 'set_base' é o pino de dados (data_pin).
+    sm_config_set_set_pins(&c, pin, 1);
+    // 'sideset_base' também é o pino de dados, já que o side-set controla o pino de dados.
+    sm_config_set_out_pins(&c, pin, 1);
+    sm_config_set_sideset_pins(&c, pin);
+
+    // Inicializa os pinos como saídas do PIO.
+    pio_sm_set_consecutive_pins(pio, sm, pin, 1, true);
+
+    // Habilita as saídas (out_shiftdir_right significa MSB primeiro).
+    sm_config_set_out_shift(&c, true, true, 24); // GRB de 24 bits (ou 32 bits para RGBW, se rgbw for true)
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX); // Junta TX e RX FIFOs para uma FIFO TX maior.
+
+    // Define o divisor de clock para atingir a frequência desejada para o PIO.
+    // O timing de cada bit é de 10 ciclos. Para 800kHz (WS2812B padrão), precisamos de 1.25us por bit.
+    // 10 ciclos * (1 / clock_freq) = 1.25us => clock_freq = 10 / 1.25us = 8MHz
+    // clock_get_hz(clk_sys) é geralmente 125MHz.
+    float div = clock_get_hz(clk_sys) / freq; // Freq aqui é o target_PIO_clock_freq, ou seja, 8MHz
+    sm_config_set_clkdiv(&c, div);
+
+    // Inicializa o Estado da Máquina com a configuração.
+    pio_sm_init(pio, sm, offset, &c);
+    // Habilita o Estado da Máquina.
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
