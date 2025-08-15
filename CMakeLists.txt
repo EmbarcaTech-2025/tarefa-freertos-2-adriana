@@ -78,8 +78,10 @@ target_link_libraries(embarcatech-tarefa-freertos-2-
     hardware_i2c
     hardware_adc
     hardware_pwm
-    #hardware_pio
-    #hardware_clocks
+    hardware_pio
+    hardware_clocks
+    hardware_gpio
+    hardware_dma
     FreeRTOS-Kernel-Heap4
 )
 
