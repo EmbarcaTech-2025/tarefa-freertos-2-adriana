@@ -47,19 +47,19 @@ include(${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_i
 # Adiciona o executável
 add_executable(embarcatech-tarefa-freertos-2-
         main.c
-        # ws2818b.pio
+        #ws2818b.pio.h
         oled/ssd1306.c
         src/joystick_task.c
         src/car_indicators_task.c
-        # src/car_status_data.h
+        src/injector_task.c
         src/car_control_task.c
         src/oled_task.c
-        #src/led_matrix_task.c
+        src/led_matrix.c
         src/engine_sound_task.c
 )
 
-# Agora o pico_add_pio_program deve funcionar
-# pico_add_pio_program(embarcatech-tarefa-freertos-2 ${CMAKE_CURRENT_LIST_DIR}/ws2818b.pio)
+# Gera o header do arquivo pio
+pico_generate_pio_header(embarcatech-tarefa-freertos-2- ${CMAKE_CURRENT_LIST_DIR}/ws2818b.pio)
 
 # Ativa USB
 pico_enable_stdio_usb(embarcatech-tarefa-freertos-2- 1)
